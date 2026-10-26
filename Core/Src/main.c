@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -30,7 +30,7 @@
 #define LED_1 67
 
 // グローバル
-uint16_t dma_data[64];
+uint16_t dma_data[88];
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -60,6 +60,13 @@ static void MX_DMA_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
+
+int _write(int file, char *ptr, int len)
+{
+	HAL_UART_Transmit(&huart2, (uint8_t*)ptr, len, HAL_MAX_DELAY);
+	return len;
+}
+
 /*
  * (8bit → PWMのCCR値8個へ変換) × 3
  *
@@ -70,31 +77,36 @@ static void MX_TIM3_Init(void);
  */
 void MakeDMAData(uint8_t data_g, uint8_t data_r, uint8_t data_b)
 {
-    // G → R → B の順に24bitをPWM値へ変換
-    for (int i = 0; i < 8; i++){
-        // G
-        if (data_g & (1 << (7 - i))){
-            dma_data[i] = LED_1;
-        }else{
-            dma_data[i] = LED_0;
-        }
+    // LED 1
+    for (int i = 0; i < 8; i++)
+    {
+        dma_data[i] =
+            (data_g & (1 << (7 - i))) ? LED_1 : LED_0;
 
-        // R
-        if (data_r & (1 << (7 - i))){
-            dma_data[8 + i] = LED_1;
-        }else{
-            dma_data[8 + i] = LED_0;
-        }
+        dma_data[8 + i] =
+            (data_r & (1 << (7 - i))) ? LED_1 : LED_0;
 
-        // B
-        if (data_b & (1 << (7 - i))){
-            dma_data[16 + i] = LED_1;
-        }else{
-            dma_data[16 + i] = LED_0;
-        }
+        dma_data[16 + i] =
+            (data_b & (1 << (7 - i))) ? LED_1 : LED_0;
     }
-    for(int i=24; i<64; i++){
-    	dma_data[i] = 0;
+
+    // LED 2
+    for (int i = 0; i < 8; i++)
+    {
+        dma_data[24 + i] =
+            (data_g & (1 << (7 - i))) ? LED_1 : LED_0;
+
+        dma_data[32 + i] =
+            (data_r & (1 << (7 - i))) ? LED_1 : LED_0;
+
+        dma_data[40 + i] =
+            (data_b & (1 << (7 - i))) ? LED_1 : LED_0;
+    }
+
+    // RESET
+    for (int i = 48; i < 88; i++)
+    {
+        dma_data[i] = 0;
     }
 }
 /* USER CODE END PFP */
@@ -142,20 +154,29 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-
+while(1){
   MakeDMAData(255, 0, 0);
+
+  printf("DMA DATA:\r\n");
+  for (int i = 0; i < 64; i++)
+  {
+      printf("%d: %u\r\n", i, dma_data[i]);
+  }
 
   __HAL_TIM_ENABLE_OCxPRELOAD(&htim3, TIM_CHANNEL_1);
 
-  // TIM3 CH1でPWM + DMA開始
+	  // TIM3 CH1でPWM + DMA開始
   if(HAL_TIM_PWM_Start_DMA(
-      &htim3,
-      TIM_CHANNEL_1,
-      (uint32_t *)dma_data,
-      64
+		  &htim3,
+		  TIM_CHANNEL_1,
+		  (uint32_t *)dma_data,
+		  88
   ) != HAL_OK){
 	  Error_Handler();
+  }else{
+	  printf("DMA Start OK\r\n");
   }
+}
 
 
   while (1)
@@ -352,6 +373,7 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
 
 /* USER CODE END 4 */
 
